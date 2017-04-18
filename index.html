@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+</head>
+<body>
+
+<h1>split costs</h1>
+
+<script>
+
+var data = `Place, Total in USD, Per Person, USER1, USER2, USER3, USER4, USER5, USER 6,
+
+Restaurant,120.64,24.13,,-,$,,,-,`;
+var data = data.split(/\n/);
+var people = {};
+var couples = [[3,4], [5,6]];
+
+
+// First determine who's participating in this shitstorm
+var firstRow = data[0].split(',');
+for( var i = 3; i< firstRow.length; i++ ) {
+	var person = firstRow[i];
+	people[i] = {
+		"name":person, 
+		"id": i, 
+		"paidFor": {}
+	};
+}
+
+// In this step we compelte making the object with adjacent people
+var peopleIds = Object.keys(people);
+for (var person in people) {
+	for(var arrayIndex in peopleIds) {
+		var personId = peopleIds[arrayIndex];
+		if(personId != person) {
+			people[person].paidFor[personId] = {"id": personId, "amount": 0};
+		}
+	}
+}
+
+
+// Create who paid what amount
+console.log('Found ' + (data.length - 1) + ' entries to split');
+for(var i = 1; i < data.length; i++) {
+	var dataRow = data[i].split(',');
+	
+	var amountPaid = parseFloat(dataRow[1]);
+	var splitAmongstHowMany = 0;
+	var whoPaidId = -1;
+	var whoOwes = [];
+	
+	for (var j = 3; j < dataRow.length; j++) {
+		if (dataRow[j] != 'X' && dataRow[j] != '-') {
+			splitAmongstHowMany++;
+			if (dataRow[j] == '$') {
+				whoPaidId = j;
+			} else {
+				whoOwes.push(j);
+			}
+		}
+	}
+	
+	if(whoPaidId == -1) {
+		console.error('Something went wrong here, ' +  data[i]);
+	}
+	
+	var whoPaid = people[whoPaidId];
+	var splitTotal = (amountPaid/splitAmongstHowMany);
+	
+	var names = '';
+	for(var j = 0; j < whoOwes.length; j++ ) {
+		var personId = whoOwes[j];
+		whoPaid.paidFor[personId].amount += splitTotal;
+		names += (names.length ? ', ' : '') + people[personId].name;
+	}
+	
+	console.log(whoPaid.name + ' paid $' + amountPaid + ' for "' + dataRow[0] + '", split ' + splitAmongstHowMany + ' ways for $' + splitTotal.toFixed(2) + ' each. [' + names + ', ' + whoPaid.name + ']');
+	
+}
+
+console.log('Show data collected prior to modifications');
+var str = JSON.stringify(people, null, 2);
+console.log(str); 
+
+// Go through the ledger and move things away from one couple and add it to the other couple
+console.log('Clean up the ledger by consolidating couples');
+for(var i = 0; i < couples.length; i++) {
+	var spouseId1 = couples[i][0];
+	var spouseId2 = couples[i][1];
+
+	var spouse1 = people[spouseId1];
+	var spouse2 = people[spouseId2];
+	
+	for (id in people) {
+		var person = people[id];
+		if(id != spouseId1 && id != spouseId2 && person.paidFor[spouseId2].amount != 0) {
+			console.log('Adjusting ' + person.name + '\'s ledger by consolidating ' + spouse1.name + ' with ' + spouse2.name);
+			person.paidFor[spouseId1].amount += person.paidFor[spouseId2].amount;
+			delete person.paidFor[spouseId2];
+		}
+	}
+	
+	for (id in spouse2.paidFor) {
+		if(id != spouseId1 && id != spouseId2 && spouse2.paidFor[id].amount != 0) {
+			console.log('Consolidating ' + spouse2.name + '\'s purchases with ' + spouse1.name + ' for ' + people[id].name);
+			spouse1.paidFor[id].amount += spouse2.paidFor[id].amount;	
+		}
+	}
+	
+	console.log('Removing spouse, ' + people[spouseId2].name );
+	
+	delete people[spouseId1].paidFor[spouseId2];
+	delete people[spouseId2];
+	
+	
+}
+
+console.log('Show data collected after spouse consolidation');
+var str = JSON.stringify(people, null, 2); 
+console.log(str); 
+
+// Go through the ledger to make sense of who owes who
+for(var id in people) {
+	var person = people[id];
+
+	for (var paidForId in person.paidFor) {
+		var paidFor = person.paidFor[paidForId];
+		
+		var tempPaidForPersonName = people[paidForId].name;
+		
+		var amount1 = people[paidForId].paidFor[id].amount;
+		var amount2 = paidFor.amount;
+		
+		if (amount1 > amount2) {
+			console.log(person.name + ' owes ' + tempPaidForPersonName + ', $' + (amount1 - amount2).toFixed(2) + ' ($' + amount1.toFixed(2) + ' - $' + amount2.toFixed(2) + ')');
+		}
+	}
+}
+
+
+
+
+
+</script>
+
+
+
+</body>
+</html>
